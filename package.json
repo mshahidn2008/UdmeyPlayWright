@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/alexhddev/playwright-course#readme",
   "devDependencies": {
+    "@azure/identity": "^4.13.1",
+    "@azure/playwright": "^1.1.3",
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.5.0"
   }
