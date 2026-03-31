@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { Shop } from "./Shop.spec";
-import { Contact } from "./Contact.spec";
+import { Shop } from "./Shop";
+import { Contact } from "./Contact";
 
 test('Home Test', async ({ page }) => {
     await page.goto('https://valentinos-magic-beans.click/');

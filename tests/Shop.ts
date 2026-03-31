@@ -1,10 +1,7 @@
 import { expect, Page } from "@playwright/test";
 
 export class Shop {
-    constructor(private readonly page: Page) {
-
-        this.page.goto('https://valentinos-magic-beans.click/');
-    }
+    constructor(private readonly page: Page) {}
 
     async gotoShop(): Promise<void> {
         const shopLink = this.page.getByRole('link', { name: 'Shop', exact: true });

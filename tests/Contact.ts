@@ -1,9 +1,7 @@
-import { Page, expect } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export class Contact {
-    constructor(private readonly page: Page) {
-        this.page.goto('https://valentinos-magic-beans.click/');
-    }
+    constructor(private readonly page: Page) {}
 
     async gotoContact(): Promise<void> {
         const contactLink = this.page.getByRole('link', { name: 'Contact', exact: true });
