@@ -1,70 +1,66 @@
-trigger:
-  branches:
-    include:
-      - main
-      - master
+jobs:
+  - job: PlaywrightTests
+    displayName: 'Run Playwright Tests'
+    timeoutInMinutes: 60
+    pool:
+      vmImage: 'ubuntu-latest'
 
-pr:
-  branches:
-    include:
-      - main
-      - master
+    variables:
+      node_version: '20'
+      azureServiceConnection: 'Azure-Service-Connection'
 
-pool:
-  vmImage: 'ubuntu-latest'
+    steps:
+      - checkout: self
+        clean: true
 
-variables:
-  node_version: '20'
-  # Set this in Pipeline Variables or Variable Group if you use Microsoft Playwright Testing
-  # PLAYWRIGHT_SERVICE_URL: 'wss://...'
+      - task: UseNode@1
+        displayName: 'Use Node.js $(node_version)'
+        inputs:
+          version: '$(node_version)'
 
-steps:
-  - checkout: self
-    clean: true
+      - script: |
+          node -v
+          npm -v
+        displayName: 'Show Node and npm versions'
 
-  - task: UseNode@1
-    displayName: 'Use Node.js $(node_version)'
-    inputs:
-      version: '$(node_version)'
+      - script: npm ci
+        displayName: 'Install dependencies'
 
-  - script: |
-      node -v
-      npm -v
-    displayName: 'Show Node and npm versions'
+      - task: AzureCLI@2
+        displayName: 'Azure login with service connection'
+        inputs:
+          azureSubscription: '$(azureServiceConnection)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            echo "Logged into Azure"
+            az account show --output table
 
-  - script: npm ci
-    displayName: 'Install dependencies'
+      - script: npx playwright install --with-deps
+        displayName: 'Install Playwright browsers'
 
-  - script: npx playwright install --with-deps
-    displayName: 'Install Playwright browsers'
+      - script: |
+          npx playwright test --config=playwright.service.config.ts --workers=5
+        displayName: 'Run Playwright tests'
+        env:
+          CI: 'true'
+          PLAYWRIGHT_SERVICE_URL: $(PLAYWRIGHT_SERVICE_URL)
 
-  # If your project needs a build step, uncomment this:
-  # - script: npm run build
-  #   displayName: 'Build application'
+      - task: PublishTestResults@2
+        displayName: 'Publish test results'
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '**/junit.xml'
+          searchFolder: '$(System.DefaultWorkingDirectory)'
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          testRunTitle: 'Playwright Test Results'
 
-  - script: |
-      npx playwright test --reporter=line,junit,html
-    displayName: 'Run Playwright tests'
-    env:
-      CI: 'true'
-      # Uncomment if you use Microsoft Playwright Testing service
-      # PLAYWRIGHT_SERVICE_URL: $(PLAYWRIGHT_SERVICE_URL)
-
-  - task: PublishTestResults@2
-    displayName: 'Publish test results'
-    condition: succeededOrFailed()
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**/junit.xml'
-      searchFolder: '$(System.DefaultWorkingDirectory)'
-      mergeTestResults: true
-      failTaskOnFailedTests: true
-      testRunTitle: 'Playwright Test Results'
-
-  - task: PublishPipelineArtifact@1
-    displayName: 'Publish Playwright HTML report'
-    condition: succeededOrFailed()
-    inputs:
-      targetPath: 'playwright-report'
-      artifact: 'playwright-report'
-      publishLocation: 'pipeline'
+      - task: PublishPipelineArtifact@1
+        displayName: 'Publish Playwright report'
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: 'playwright-report'
+          artifact: 'playwright-report'
+          publishLocation: 'pipeline'
