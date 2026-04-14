@@ -1,43 +1,70 @@
-name: Playwright Tests
+trigger:
+  branches:
+    include:
+      - main
+      - master
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+pr:
+  branches:
+    include:
+      - main
+      - master
 
-jobs:
-  test:
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
+pool:
+  vmImage: 'ubuntu-latest'
 
-    steps:
-      - uses: actions/checkout@v5
+variables:
+  node_version: '20'
+  # Set this in Pipeline Variables or Variable Group if you use Microsoft Playwright Testing
+  # PLAYWRIGHT_SERVICE_URL: 'wss://...'
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: lts/*
+steps:
+  - checkout: self
+    clean: true
 
-      - name: Install dependencies
-        run: npm ci
+  - task: UseNode@1
+    displayName: 'Use Node.js $(node_version)'
+    inputs:
+      version: '$(node_version)'
 
-      - name: AZURE_AI_TEST
-        uses: azure/login@v3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+  - script: |
+      node -v
+      npm -v
+    displayName: 'Show Node and npm versions'
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+  - script: npm ci
+    displayName: 'Install dependencies'
 
-      - name: Run Playwright tests
-        env:
-          PLAYWRIGHT_SERVICE_URL: ${{ vars.PLAYWRIGHT_SERVICE_URL }}
-        run: npx playwright test tests/UseCase.spec.ts --config=playwright.service.config.ts --workers=4
+  - script: npx playwright install --with-deps
+    displayName: 'Install Playwright browsers'
 
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
-          if-no-files-found: ignore
+  # If your project needs a build step, uncomment this:
+  # - script: npm run build
+  #   displayName: 'Build application'
+
+  - script: |
+      npx playwright test --reporter=line,junit,html
+    displayName: 'Run Playwright tests'
+    env:
+      CI: 'true'
+      # Uncomment if you use Microsoft Playwright Testing service
+      # PLAYWRIGHT_SERVICE_URL: $(PLAYWRIGHT_SERVICE_URL)
+
+  - task: PublishTestResults@2
+    displayName: 'Publish test results'
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**/junit.xml'
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+      testRunTitle: 'Playwright Test Results'
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Playwright HTML report'
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: 'playwright-report'
+      artifact: 'playwright-report'
+      publishLocation: 'pipeline'
